@@ -30,10 +30,23 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useUiStore } from "@/store";
 import { listCropYears } from "@/lib/cropYears";
 import { listMasterRiceTypes } from "@/lib/masterRiceTypes";
-import { listSeasonBagRates, upsertSeasonBagRates } from "@/lib/seasonBagRates";
+import {
+  listSeasonBagRates,
+  resetSeasonBagRates,
+  upsertSeasonBagRates,
+} from "@/lib/seasonBagRates";
 import { formatBagSizeLabel, toNumberOrNull } from "@/lib/money";
 import type { CropYear } from "@/types/cropYears";
 import type { BagSize, SeasonCode } from "@/types/seasonBagRates";
@@ -75,8 +88,13 @@ export default function BagRatesPage() {
     queryFn: () => listMasterRiceTypes({ includeInactive: false }),
   });
 
-  const cropYears = cropYearsQuery.data?.data.items ?? [];
-  const riceTypes = riceTypesQuery.data?.data.items ?? [];
+  const cropYears = React.useMemo(() => {
+    return cropYearsQuery.data?.data.items ?? [];
+  }, [cropYearsQuery.data?.data.items]);
+
+  const riceTypes = React.useMemo(() => {
+    return riceTypesQuery.data?.data.items ?? [];
+  }, [riceTypesQuery.data?.data.items]);
 
   const cropYearStartYearOptions = React.useMemo(() => {
     const years = cropYears.map((c: CropYear) => c.startYear);
@@ -89,6 +107,8 @@ export default function BagRatesPage() {
   const [initialRates, setInitialRates] = React.useState<RateInputs>({});
   const [formError, setFormError] = React.useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = React.useState<string | null>(null);
+  const [resetOpen, setResetOpen] = React.useState(false);
+  const [resetConfirmText, setResetConfirmText] = React.useState("");
 
   React.useEffect(() => {
     if (cropYearStartYear !== null) return;
@@ -102,6 +122,10 @@ export default function BagRatesPage() {
     setLastSavedAt(null);
     setFormError(null);
   }, [selectedYear, seasonCode]);
+
+  React.useEffect(() => {
+    if (!resetOpen) setResetConfirmText("");
+  }, [resetOpen]);
 
   const cropYearLabelByStartYear = React.useMemo(() => {
     const m = new Map<number, string>();
@@ -121,20 +145,28 @@ export default function BagRatesPage() {
       }),
   });
 
+  const bagRateItems = React.useMemo(() => {
+    return bagRatesQuery.data?.data.items ?? [];
+  }, [bagRatesQuery.data?.data.items]);
+
   React.useEffect(() => {
     const codes = riceTypes.map((t) => t.code);
     const base = makeEmptyRates(codes);
 
-    const existing = bagRatesQuery.data?.data.items ?? [];
-    for (const item of existing) {
+    for (const item of bagRateItems) {
       if (!base[item.riceType.code]) continue;
-      base[item.riceType.code][item.bagSize] = truncateToTwoDecimals(item.rateRupees);
+      base[item.riceType.code].KG_40 =
+        typeof item.rates.KG_40 === "number" ? truncateToTwoDecimals(item.rates.KG_40) : "";
+      base[item.riceType.code].KG_75 =
+        typeof item.rates.KG_75 === "number" ? truncateToTwoDecimals(item.rates.KG_75) : "";
+      base[item.riceType.code].KG_100 =
+        typeof item.rates.KG_100 === "number" ? truncateToTwoDecimals(item.rates.KG_100) : "";
     }
 
     setRates(base);
     setInitialRates(base);
     setFormError(null);
-  }, [bagRatesQuery.data?.data.items, riceTypes]);
+  }, [bagRateItems, riceTypes]);
 
   const isDirty = React.useMemo(() => {
     for (const rt of riceTypes) {
@@ -154,19 +186,47 @@ export default function BagRatesPage() {
         throw new Error("Select a crop year.");
       }
 
-      const payloadRates: Array<{ riceTypeCode: string; bagSize: BagSize; rateRupees: number }> = [];
+      const payloadRates: Array<{
+        riceTypeCode: string;
+        rates: { KG_40: number; KG_75: number; KG_100: number };
+      }> = [];
       for (const rt of riceTypes) {
-        for (const size of BAG_SIZES) {
-          const raw = rates[rt.code]?.[size] ?? "";
-          const n = toNumberOrNull(raw);
-          if (n === null) {
-            throw new Error(`Enter a rate for ${rt.code} (${formatBagSizeLabel(size)}).`);
-          }
-          if (n < 0) {
-            throw new Error(`Enter a valid rate for ${rt.code} (${formatBagSizeLabel(size)}).`);
-          }
-          payloadRates.push({ riceTypeCode: rt.code, bagSize: size, rateRupees: n });
+        const raw40 = rates[rt.code]?.KG_40 ?? "";
+        const raw75 = rates[rt.code]?.KG_75 ?? "";
+        const raw100 = rates[rt.code]?.KG_100 ?? "";
+
+        const n40 = toNumberOrNull(raw40);
+        const n75 = toNumberOrNull(raw75);
+        const n100 = toNumberOrNull(raw100);
+
+        if (n100 === null) {
+          throw new Error(`Enter a rate for ${rt.code} (${formatBagSizeLabel("KG_100")}).`);
         }
+        if (n75 === null) {
+          throw new Error(`Enter a rate for ${rt.code} (${formatBagSizeLabel("KG_75")}).`);
+        }
+        if (n40 === null) {
+          throw new Error(`Enter a rate for ${rt.code} (${formatBagSizeLabel("KG_40")}).`);
+        }
+
+        if (n100 < 0) {
+          throw new Error(`Enter a valid rate for ${rt.code} (${formatBagSizeLabel("KG_100")}).`);
+        }
+        if (n75 < 0) {
+          throw new Error(`Enter a valid rate for ${rt.code} (${formatBagSizeLabel("KG_75")}).`);
+        }
+        if (n40 < 0) {
+          throw new Error(`Enter a valid rate for ${rt.code} (${formatBagSizeLabel("KG_40")}).`);
+        }
+
+        payloadRates.push({
+          riceTypeCode: rt.code,
+          rates: {
+            KG_40: n40,
+            KG_75: n75,
+            KG_100: n100,
+          },
+        });
       }
 
       return upsertSeasonBagRates({
@@ -183,7 +243,12 @@ export default function BagRatesPage() {
       const existing = res.data.items ?? [];
       for (const item of existing) {
         if (!base[item.riceType.code]) continue;
-        base[item.riceType.code][item.bagSize] = truncateToTwoDecimals(item.rateRupees);
+        base[item.riceType.code].KG_40 =
+          typeof item.rates.KG_40 === "number" ? truncateToTwoDecimals(item.rates.KG_40) : "";
+        base[item.riceType.code].KG_75 =
+          typeof item.rates.KG_75 === "number" ? truncateToTwoDecimals(item.rates.KG_75) : "";
+        base[item.riceType.code].KG_100 =
+          typeof item.rates.KG_100 === "number" ? truncateToTwoDecimals(item.rates.KG_100) : "";
       }
 
       setRates(base);
@@ -193,6 +258,50 @@ export default function BagRatesPage() {
     },
     onError: (err: unknown) => {
       const message = err instanceof Error ? err.message : "Save failed.";
+      setFormError(message);
+      showToast(message, "error");
+    },
+  });
+
+  const resetMutation = useMutation({
+    mutationFn: async () => {
+      setFormError(null);
+      if (typeof selectedYear !== "number") {
+        throw new Error("Select a crop year.");
+      }
+
+      return resetSeasonBagRates({
+        cropYearStartYear: selectedYear,
+        seasonCode,
+        confirm: resetConfirmText,
+      });
+    },
+    onSuccess: (res) => {
+      showToast(res.message ?? "Bag rates reset to 0.00.", "success");
+
+      const codes = riceTypes.map((t) => t.code);
+      const base = makeEmptyRates(codes);
+
+      const existing = res.data.items ?? [];
+      for (const item of existing) {
+        if (!base[item.riceType.code]) continue;
+        base[item.riceType.code].KG_40 =
+          typeof item.rates.KG_40 === "number" ? truncateToTwoDecimals(item.rates.KG_40) : "";
+        base[item.riceType.code].KG_75 =
+          typeof item.rates.KG_75 === "number" ? truncateToTwoDecimals(item.rates.KG_75) : "";
+        base[item.riceType.code].KG_100 =
+          typeof item.rates.KG_100 === "number" ? truncateToTwoDecimals(item.rates.KG_100) : "";
+      }
+
+      setRates(base);
+      setInitialRates(base);
+      setLastSavedAt(new Date().toISOString());
+      setFormError(null);
+      setResetOpen(false);
+      void queryClient.invalidateQueries({ queryKey: ["seasonBagRates", selectedYear, seasonCode] });
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : "Reset failed.";
       setFormError(message);
       showToast(message, "error");
     },
@@ -262,7 +371,11 @@ export default function BagRatesPage() {
             No active rice types found. Create rice types first.
           </div>
         ) : bagRatesQuery.isError ? (
-          <div className="text-sm text-destructive">Failed to load bag rates.</div>
+          <div className="text-sm text-destructive">
+            {bagRatesQuery.error instanceof Error
+              ? bagRatesQuery.error.message
+              : "Failed to load bag rates."}
+          </div>
         ) : (
           <Table>
             <TableHeader>
@@ -356,18 +469,72 @@ export default function BagRatesPage() {
           )}
         </div>
 
-        <Button
-          disabled={
-            saveMutation.isPending ||
-            riceTypes.length === 0 ||
-            typeof selectedYear !== "number" ||
-            !isDirty
-          }
-          onClick={() => saveMutation.mutate()}
-        >
-          {saveMutation.isPending ? "Saving…" : "Save changes"}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={saveMutation.isPending || resetMutation.isPending || riceTypes.length === 0}
+            onClick={() => setResetOpen(true)}
+          >
+            Reset
+          </Button>
+
+          <Button
+            disabled={
+              saveMutation.isPending ||
+              resetMutation.isPending ||
+              riceTypes.length === 0 ||
+              typeof selectedYear !== "number" ||
+              !isDirty
+            }
+            onClick={() => saveMutation.mutate()}
+          >
+            {saveMutation.isPending ? "Saving…" : "Save changes"}
+          </Button>
+        </div>
       </CardFooter>
+
+      <Dialog open={resetOpen} onOpenChange={setResetOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset bag rates?</DialogTitle>
+            <DialogDescription>
+              This will set all bag rates to 0.00 for the selected crop year and season. This is
+              an admin-only action.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <div className="text-sm">Type RESET to confirm</div>
+            <Input
+              value={resetConfirmText}
+              onChange={(e) => setResetConfirmText(e.target.value)}
+              placeholder="RESET"
+              autoComplete="off"
+            />
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setResetOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => resetMutation.mutate()}
+              disabled={
+                saveMutation.isPending ||
+                resetMutation.isPending ||
+                riceTypes.length === 0 ||
+                typeof selectedYear !== "number" ||
+                resetConfirmText !== "RESET"
+              }
+            >
+              {resetMutation.isPending ? "Resetting…" : "Reset to zero"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

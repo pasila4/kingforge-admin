@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -531,10 +531,11 @@ export default function IkpMandalsPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
-                            <DropdownMenuTrigger>
-                              <Button variant="ghost" size="icon-xs">
-                                <MoreHorizontalIcon className="size-3.5" />
-                              </Button>
+                            <DropdownMenuTrigger
+                              aria-label="Open actions"
+                              className={buttonVariants({ size: "icon-xs", variant: "ghost" })}
+                            >
+                              <MoreHorizontalIcon className="size-3.5" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setEditing(row)}>

@@ -14,6 +14,7 @@ import BagRatesPage from "./pages/master-data/BagRatesPage";
 import IkpCentersPage from "./pages/master-data/IkpCentersPage";
 import LocationsMasterPage from "./pages/master-data/LocationsMasterPage";
 import LegacyIkpLocationsRedirect from "./pages/master-data/LegacyIkpLocationsRedirect";
+import ByProductsPage from "./pages/master-data/ByProductsPage";
 
 function RedirectIfAuthed({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/organizations" element={<OrganizationsPage />} />
           <Route path="/master-data/rice-types" element={<RiceTypesPage />} />
           <Route path="/master-data/varieties" element={<VarietiesPage />} />
+          <Route path="/master-data/by-products" element={<ByProductsPage />} />
           <Route path="/master-data/crop-years" element={<CropYearsPage />} />
           <Route path="/master-data/bag-rates" element={<BagRatesPage />} />
           <Route path="/master-data/locations" element={<LocationsMasterPage />} />

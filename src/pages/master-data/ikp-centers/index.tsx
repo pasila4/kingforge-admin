@@ -40,10 +40,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontalIcon } from "lucide-react";
 
-import {
-  GroupedCombobox,
-  type GroupedComboboxGroup,
-} from "@/components/ui/grouped-combobox";
+import { LocationSearchCombobox } from "@/components/ui/location-search-combobox";
 import { BulkUploadIkpCentersDialog } from "@/components/BulkUploadIkpCentersDialog";
 
 import { useUiStore } from "@/store";
@@ -61,17 +58,9 @@ import type {
   UpdateAdminIkpCenterRequest,
 } from "@/types/adminIkpCenters";
 import {
-  listAdminDistricts,
-  listAdminMandals,
-  listAdminStates,
-  listAdminVillages,
+
 } from "@/lib/adminLocations";
-import type {
-  AdminDistrict,
-  AdminMandal,
-  AdminState,
-  AdminVillage,
-} from "@/types/adminLocations";
+
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -89,9 +78,6 @@ export default function IkpCentersPage() {
 
   const [filters, setFilters] = React.useState({
     search: "",
-    stateId: "",
-    districtId: "",
-    mandalId: "",
     villageId: "",
     includeInactive: true,
   });
@@ -112,9 +98,6 @@ export default function IkpCentersPage() {
 
   const [createInitialValues, setCreateInitialValues] =
     React.useState<IkpCenterFormData>({
-      stateId: "",
-      districtId: "",
-      mandalId: "",
       villageId: "",
       name: "",
       notes: "",
@@ -127,7 +110,7 @@ export default function IkpCentersPage() {
     setPage(1);
   }, [filters]);
 
-  const dialogOpen = createOpen || Boolean(editing);
+
 
   const listQuery = useQuery({
     queryKey: ["adminIkpCenters", page, limit, filters],
@@ -136,95 +119,12 @@ export default function IkpCentersPage() {
         page,
         limit,
         search: filters.search,
-        stateId: filters.stateId,
-        districtId: filters.districtId,
-        mandalId: filters.mandalId,
         villageId: filters.villageId,
         includeInactive: filters.includeInactive,
       }),
   });
 
-  const statesQuery = useQuery({
-    queryKey: ["adminIkpStatesForCenters"],
-    queryFn: () =>
-      listAdminStates({
-        page: 1,
-        limit: 50,
-        includeInactive: true,
-      }),
-  });
 
-  const districtsForDialogQuery = useQuery({
-    queryKey: ["adminIkpDistrictsForCentersDialog"],
-    queryFn: () =>
-      listAdminDistricts({
-        page: 1,
-        limit: 2000,
-        includeInactive: true,
-      }),
-    enabled: dialogOpen && statesQuery.isSuccess,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const mandalsForDialogQuery = useQuery({
-    queryKey: ["adminIkpMandalsForCentersDialog"],
-    queryFn: () =>
-      listAdminMandals({
-        page: 1,
-        limit: 5000,
-        includeInactive: true,
-      }),
-    enabled: dialogOpen && statesQuery.isSuccess,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const villagesForDialogQuery = useQuery({
-    queryKey: ["adminIkpVillagesForCentersDialog"],
-    queryFn: () =>
-      listAdminVillages({
-        page: 1,
-        limit: 10000,
-        includeInactive: true,
-      }),
-    enabled: dialogOpen && statesQuery.isSuccess,
-    staleTime: 5 * 60 * 1000,
-  });
-
-  const districtsQuery = useQuery({
-    enabled: Boolean(filters.stateId && filters.stateId.trim()),
-    queryKey: ["adminIkpDistrictsForCenters", filters.stateId],
-    queryFn: () =>
-      listAdminDistricts({
-        page: 1,
-        limit: 300,
-        stateId: filters.stateId,
-        includeInactive: true,
-      }),
-  });
-
-  const mandalsQuery = useQuery({
-    enabled: Boolean(filters.districtId && filters.districtId.trim()),
-    queryKey: ["adminIkpMandalsForCenters", filters.districtId],
-    queryFn: () =>
-      listAdminMandals({
-        page: 1,
-        limit: 500,
-        districtId: filters.districtId,
-        includeInactive: true,
-      }),
-  });
-
-  const villagesQuery = useQuery({
-    enabled: Boolean(filters.mandalId && filters.mandalId.trim()),
-    queryKey: ["adminIkpVillagesForCenters", filters.mandalId],
-    queryFn: () =>
-      listAdminVillages({
-        page: 1,
-        limit: 800,
-        mandalId: filters.mandalId,
-        includeInactive: true,
-      }),
-  });
 
   const createMutation = useMutation({
     mutationFn: createAdminIkpCenter,
@@ -234,9 +134,6 @@ export default function IkpCentersPage() {
         const last = lastCreateValuesRef.current;
         return {
           ...p,
-          stateId: last?.stateId ?? p.stateId,
-          districtId: last?.districtId ?? p.districtId,
-          mandalId: last?.mandalId ?? p.mandalId,
           villageId: last?.villageId ?? p.villageId,
           name: "",
           notes: "",
@@ -316,66 +213,7 @@ export default function IkpCentersPage() {
   const items = listQuery.data?.data.items ?? [];
   const total = listQuery.data?.data.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / limit));
-  const states: AdminState[] = statesQuery.data?.data.items ?? [];
-  const districtsForDialog: AdminDistrict[] =
-    districtsForDialogQuery.data?.data.items ?? [];
-  const mandalsForDialog: AdminMandal[] =
-    mandalsForDialogQuery.data?.data.items ?? [];
-  const villagesForDialog: AdminVillage[] =
-    villagesForDialogQuery.data?.data.items ?? [];
-  const filterDistricts: AdminDistrict[] =
-    districtsQuery.data?.data.items ?? [];
-  const filterMandals: AdminMandal[] = mandalsQuery.data?.data.items ?? [];
-  const filterVillages: AdminVillage[] =
-    villagesQuery.data?.data.items ?? [];
 
-  const stateFilterGroups = React.useMemo<GroupedComboboxGroup[]>(() => {
-    return [
-      {
-        label: "States",
-        options: states.map((s) => ({
-          value: s.id,
-          label: `${s.code} - ${s.name}${s.isActive ? "" : " (inactive)"}`,
-        })),
-      },
-    ];
-  }, [states]);
-
-  const districtFilterGroups = React.useMemo<GroupedComboboxGroup[]>(() => {
-    return [
-      {
-        label: "Districts",
-        options: filterDistricts.map((d) => ({
-          value: d.id,
-          label: `${d.name}${d.isActive ? "" : " (inactive)"}`,
-        })),
-      },
-    ];
-  }, [filterDistricts]);
-
-  const mandalFilterGroups = React.useMemo<GroupedComboboxGroup[]>(() => {
-    return [
-      {
-        label: "Mandals",
-        options: filterMandals.map((m) => ({
-          value: m.id,
-          label: `${m.name}${m.isActive ? "" : " (inactive)"}`,
-        })),
-      },
-    ];
-  }, [filterMandals]);
-
-  const villageFilterGroups = React.useMemo<GroupedComboboxGroup[]>(() => {
-    return [
-      {
-        label: "Villages",
-        options: filterVillages.map((v) => ({
-          value: v.id,
-          label: `${v.name}${v.isActive ? "" : " (inactive)"}`,
-        })),
-      },
-    ];
-  }, [filterVillages]);
 
   return (
     <div className="space-y-4">
@@ -408,76 +246,18 @@ export default function IkpCentersPage() {
               </InputGroup>
             </Field>
 
-            <Field>
-              <FieldLabel>State</FieldLabel>
-              <GroupedCombobox
-                value={filters.stateId}
-                onValueChange={(v) =>
-                  setFilters((p) => ({
-                    ...p,
-                    stateId: v ? (v === p.stateId ? "" : v) : "",
-                    districtId: "",
-                    mandalId: "",
-                    villageId: "",
-                  }))
-                }
-                groups={stateFilterGroups}
-                placeholder="All states"
-                emptyText="No states found."
-              />
-            </Field>
-
-            <Field>
-              <FieldLabel>District</FieldLabel>
-              <GroupedCombobox
-                value={filters.districtId}
-                onValueChange={(v) =>
-                  setFilters((p) => ({
-                    ...p,
-                    districtId: v ? (v === p.districtId ? "" : v) : "",
-                    mandalId: "",
-                    villageId: "",
-                  }))
-                }
-                groups={districtFilterGroups}
-                placeholder={filters.stateId ? "All districts" : "Select state first"}
-                emptyText={filters.stateId ? "No districts found." : "Select a state first."}
-                disabled={!filters.stateId}
-              />
-            </Field>
-
-            <Field>
-              <FieldLabel>Mandal</FieldLabel>
-              <GroupedCombobox
-                value={filters.mandalId}
-                onValueChange={(v) =>
-                  setFilters((p) => ({
-                    ...p,
-                    mandalId: v ? (v === p.mandalId ? "" : v) : "",
-                    villageId: "",
-                  }))
-                }
-                groups={mandalFilterGroups}
-                placeholder={filters.districtId ? "All mandals" : "Select district first"}
-                emptyText={filters.districtId ? "No mandals found." : "Select a district first."}
-                disabled={!filters.districtId}
-              />
-            </Field>
-
-            <Field>
-              <FieldLabel>Village</FieldLabel>
-              <GroupedCombobox
+            <Field className="md:col-span-2">
+              <FieldLabel>Location</FieldLabel>
+              <LocationSearchCombobox
+                type="village"
                 value={filters.villageId}
                 onValueChange={(v) =>
                   setFilters((p) => ({
                     ...p,
-                    villageId: v ? (v === p.villageId ? "" : v) : "",
+                    villageId: v,
                   }))
                 }
-                groups={villageFilterGroups}
-                placeholder={filters.mandalId ? "All villages" : "Select mandal first"}
-                emptyText={filters.mandalId ? "No villages found." : "Select a mandal first."}
-                disabled={!filters.mandalId}
+                placeholder="Filter by village..."
               />
             </Field>
           </div>
@@ -609,14 +389,6 @@ export default function IkpCentersPage() {
         initialValues={createInitialValues}
         onSave={(data) => createMutation.mutate(data)}
         isSaving={createMutation.isPending}
-        states={states}
-        districts={districtsForDialog}
-        mandals={mandalsForDialog}
-        villages={villagesForDialog}
-        isStatesLoading={statesQuery.isLoading}
-        isDistrictsLoading={districtsForDialogQuery.isLoading}
-        isMandalsLoading={mandalsForDialogQuery.isLoading}
-        isVillagesLoading={villagesForDialogQuery.isLoading}
       />
 
       <BulkUploadIkpCentersDialog
@@ -624,10 +396,6 @@ export default function IkpCentersPage() {
         onOpenChange={setBulkOpen}
         onUpload={(villageId, items) => bulkUploadMutation.mutate({ villageId, items })}
         isUploading={bulkUploadMutation.isPending}
-        states={states}
-        districts={districtsForDialog}
-        mandals={mandalsForDialog}
-        villages={villagesForDialog}
       />
 
       <IkpCenterDialog
@@ -640,9 +408,6 @@ export default function IkpCentersPage() {
         title="Edit center"
         description="Update center details."
         initialValues={{
-          stateId: editing?.stateId ?? "",
-          districtId: editing?.districtId ?? "",
-          mandalId: editing?.mandalId ?? "",
           villageId: editing?.villageId ?? "",
           name: editing?.name ?? "",
           notes: editing?.notes ?? "",
@@ -661,14 +426,6 @@ export default function IkpCentersPage() {
           });
         }}
         isSaving={updateMutation.isPending}
-        states={states}
-        districts={districtsForDialog}
-        mandals={mandalsForDialog}
-        villages={villagesForDialog}
-        isStatesLoading={statesQuery.isLoading}
-        isDistrictsLoading={districtsForDialogQuery.isLoading}
-        isMandalsLoading={mandalsForDialogQuery.isLoading}
-        isVillagesLoading={villagesForDialogQuery.isLoading}
       />
 
       <AlertDialog

@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { MoreHorizontalIcon, Loader2 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -46,11 +46,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  GroupedCombobox,
-  type GroupedComboboxGroup,
-} from "@/components/ui/grouped-combobox";
+
 import { Textarea } from "@/components/ui/textarea";
+
+import { LocationSearchCombobox } from "@/components/ui/location-search-combobox";
 
 import { useUiStore } from "@/store";
 import { useAuth } from "@/context/AuthContext";
@@ -62,11 +61,8 @@ import {
   deactivateAdminVillage,
   deleteAdminVillagePermanently,
   bulkUploadVillages,
-  listAdminStates,
-  listAdminDistricts,
-  listAdminMandals,
 } from "@/lib/adminLocations";
-import type { AdminVillage, AdminState, AdminDistrict, AdminMandal } from "@/types/adminLocations";
+import type { AdminVillage } from "@/types/adminLocations";
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -79,57 +75,21 @@ function BulkUploadVillagesDialog({
   onOpenChange,
   onUpload,
   isUploading,
-  states,
-  districts,
-  mandals,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpload: (parentId: string, items: string) => void;
   isUploading: boolean;
-  states: AdminState[];
-  districts: AdminDistrict[];
-  mandals: AdminMandal[];
 }) {
-  const [stateId, setStateId] = React.useState("");
-  const [districtId, setDistrictId] = React.useState("");
   const [mandalId, setMandalId] = React.useState("");
   const [items, setItems] = React.useState("");
 
   React.useEffect(() => {
     if (!open) {
-      setStateId("");
-      setDistrictId("");
       setMandalId("");
       setItems("");
     }
   }, [open]);
-
-  const filteredDistricts = React.useMemo(() => {
-    if (!stateId) return [];
-    return districts.filter(d => d.stateId === stateId);
-  }, [districts, stateId]);
-
-  const filteredMandals = React.useMemo(() => {
-    if (!districtId) return [];
-    return mandals.filter(m => m.districtId === districtId);
-  }, [mandals, districtId]);
-
-  const stateGroups: GroupedComboboxGroup[] = React.useMemo(() => ([{
-    label: "States",
-    options: states.map(s => ({ value: s.id, label: s.name }))
-  }]), [states]);
-
-  const districtGroups: GroupedComboboxGroup[] = React.useMemo(() => ([{
-    label: "Districts",
-    options: filteredDistricts.map(d => ({ value: d.id, label: d.name }))
-  }]), [filteredDistricts]);
-
-  const mandalGroups: GroupedComboboxGroup[] = React.useMemo(() => ([{
-    label: "Mandals",
-    options: filteredMandals.map(m => ({ value: m.id, label: m.name }))
-  }]), [filteredMandals]);
-
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -140,32 +100,12 @@ function BulkUploadVillagesDialog({
         </DialogHeader>
         <div className="space-y-4">
           <Field>
-            <FieldLabel>State</FieldLabel>
-            <GroupedCombobox
-              value={stateId}
-              onValueChange={(v) => { setStateId(v); setDistrictId(""); setMandalId(""); }}
-              groups={stateGroups}
-              placeholder="Select State"
-            />
-          </Field>
-          <Field>
-            <FieldLabel>District</FieldLabel>
-            <GroupedCombobox
-              value={districtId}
-              onValueChange={(v) => { setDistrictId(v); setMandalId(""); }}
-              groups={districtGroups}
-              placeholder="Select District"
-              disabled={!stateId}
-            />
-          </Field>
-          <Field>
             <FieldLabel>Mandal</FieldLabel>
-            <GroupedCombobox
+            <LocationSearchCombobox
+              type="mandal"
               value={mandalId}
               onValueChange={setMandalId}
-              groups={mandalGroups}
-              placeholder="Select Mandal"
-              disabled={!districtId}
+              placeholder="Search mandal..."
             />
           </Field>
           <Field>
@@ -237,8 +177,6 @@ export default function LocationsVillagesPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = React.useState(1);
   const [search, setSearch] = React.useState("");
-  const [stateFilter, setStateFilter] = React.useState("");
-  const [districtFilter, setDistrictFilter] = React.useState("");
   const [mandalFilter, setMandalFilter] = React.useState("");
 
 
@@ -250,31 +188,13 @@ export default function LocationsVillagesPage() {
   const [deactivateTarget, setDeactivateTarget] = React.useState<AdminVillage | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<AdminVillage | null>(null);
 
-  const statesQuery = useQuery({
-    queryKey: ["adminStates"],
-    queryFn: () => listAdminStates({ limit: 100 }),
-  });
-
-  const districtsQuery = useQuery({
-    queryKey: ["adminDistrictsAll"],
-    queryFn: () => listAdminDistricts({ limit: 2000 }),
-  });
-
-  const mandalsQuery = useQuery({
-    queryKey: ["adminMandalsAll"],
-    queryFn: () => listAdminMandals({ limit: 5000 }), // Heavy?
-  });
-
-  // Filter mandals by district only when fetching specifically?
-  // We need to pass mandalId to listAdminVillages.
-
   const query = useQuery({
-    queryKey: ["adminVillages", page, debouncedSearch, stateFilter, districtFilter, mandalFilter],
+    queryKey: ["adminVillages", page, debouncedSearch, mandalFilter],
     queryFn: () => listAdminVillages({
       page,
       limit: DEFAULT_PAGE_SIZE,
       search: debouncedSearch,
-      mandalId: mandalFilter // API only takes mandalId logic mostly.
+      mandalId: mandalFilter
     }),
   });
 
@@ -341,30 +261,6 @@ export default function LocationsVillagesPage() {
   const items = query.data?.data?.items ?? [];
   const total = query.data?.data?.total ?? 0;
   const totalPages = Math.ceil(total / DEFAULT_PAGE_SIZE);
-  const states = statesQuery.data?.data?.items ?? [];
-  const districts = districtsQuery.data?.data?.items ?? [];
-  const mandals = mandalsQuery.data?.data?.items ?? [];
-
-  const stateGroups: GroupedComboboxGroup[] = React.useMemo(() => ([{
-    label: "States",
-    options: states.map(s => ({ value: s.id, label: s.name }))
-  }]), [states]);
-
-  const districtFilterGroups: GroupedComboboxGroup[] = React.useMemo(() => {
-    const d = stateFilter ? districts.filter(x => x.stateId === stateFilter) : districts;
-    return [{
-      label: "Districts",
-      options: d.map(x => ({ value: x.id, label: x.name }))
-    }];
-  }, [districts, stateFilter]);
-
-  const mandalFilterGroups: GroupedComboboxGroup[] = React.useMemo(() => {
-    const m = districtFilter ? mandals.filter(x => x.districtId === districtFilter) : mandals;
-    return [{
-      label: "Mandals",
-      options: m.map(x => ({ value: x.id, label: x.name }))
-    }];
-  }, [mandals, districtFilter]);
 
   return (
     <div className="space-y-4">
@@ -386,30 +282,12 @@ export default function LocationsVillagesPage() {
               <InputGroupAddon>Search</InputGroupAddon>
               <InputGroupInput value={search} onChange={e => setSearch(e.target.value)} placeholder="Search..." />
             </InputGroup>
-            <div className="w-[200px]">
-              <GroupedCombobox
-                value={stateFilter}
-                onValueChange={(v) => { setStateFilter(v); setDistrictFilter(""); setMandalFilter(""); }}
-                groups={stateGroups}
-                placeholder="Filter by State"
-              />
-            </div>
-            <div className="w-[200px]">
-              <GroupedCombobox
-                value={districtFilter}
-                onValueChange={(v) => { setDistrictFilter(v); setMandalFilter(""); }}
-                groups={districtFilterGroups}
-                placeholder="Filter by District"
-                disabled={!stateFilter}
-              />
-            </div>
-            <div className="w-[200px]">
-              <GroupedCombobox
+            <div className="w-[240px]">
+              <LocationSearchCombobox
+                type="mandal"
                 value={mandalFilter}
                 onValueChange={setMandalFilter}
-                groups={mandalFilterGroups}
                 placeholder="Filter by Mandal"
-                disabled={!districtFilter}
               />
             </div>
           </div>
@@ -420,17 +298,15 @@ export default function LocationsVillagesPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead className="w-[120px]">Pincode</TableHead>
-
-                  <TableHead>Filters</TableHead>
                   <TableHead>Status</TableHead>
                   {isAdmin && <TableHead className="text-right">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {query.isLoading ? (
-                  <TableRow><TableCell colSpan={5} className="text-center">Loading...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? 3 : 2} className="text-center">Loading...</TableCell></TableRow>
                 ) : items.length === 0 ? (
-                  <TableRow><TableCell colSpan={5} className="text-center">No villages found.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={isAdmin ? 3 : 2} className="text-center">No villages found.</TableCell></TableRow>
                 ) : (
                   items.map(item => (
                     <TableRow key={item.id}>
@@ -442,17 +318,15 @@ export default function LocationsVillagesPage() {
                           disabled={!isAdmin}
                         />
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {mandals.find(m => m.id === item.mandalId)?.name} / {
-                          districts.find(d => d.id === mandals.find(m => m.id === item.mandalId)?.districtId)?.name
-                        }
-                      </TableCell>
                       <TableCell>{item.isActive ? "Active" : "Inactive"}</TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">
                           <DropdownMenu>
-                            <DropdownMenuTrigger>
-                              <Button variant="ghost" size="icon-sm"><MoreHorizontalIcon className="size-4" /></Button>
+                            <DropdownMenuTrigger
+                              aria-label="Open actions"
+                              className={buttonVariants({ size: "icon-sm", variant: "ghost" })}
+                            >
+                              <MoreHorizontalIcon className="size-4" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setEditing(item)}>Edit</DropdownMenuItem>
@@ -484,20 +358,15 @@ export default function LocationsVillagesPage() {
         open={createOpen}
         onOpenChange={setCreateOpen}
         title="New Village"
-        initialValues={{ stateId: "", districtId: "", mandalId: "", name: "", isActive: true }}
+        initialValues={{ mandalId: "", name: "", isActive: true }}
         onSave={(data) => {
           const payload = { ...data };
           if (!payload.code) {
-            // Generate a shorter unique code (max 10 chars)
-            // Using a prefix 'V' and 6 chars from a random base36 string
             payload.code = `V${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
           }
           createMutation.mutate(payload);
         }}
         isSaving={createMutation.isPending}
-        states={states}
-        districts={districts}
-        mandals={mandals}
       />
 
       {editing && (
@@ -506,19 +375,14 @@ export default function LocationsVillagesPage() {
           onOpenChange={(open) => !open && setEditing(null)}
           title="Edit Village"
           initialValues={{
-            stateId: districts.find(d => d.id === mandals.find(m => m.id === editing.mandalId)?.districtId)?.stateId || "",
-            districtId: mandals.find(m => m.id === editing.mandalId)?.districtId || "",
             mandalId: editing.mandalId,
             name: editing.name,
             code: editing.code || "",
-            pincode: editing.pincode || "", // Pincode included
+            pincode: editing.pincode || "",
             isActive: editing.isActive
           }}
           onSave={(data) => updateMutation.mutate({ id: editing.id, payload: data })}
           isSaving={updateMutation.isPending}
-          states={states}
-          districts={districts}
-          mandals={mandals}
         />
       )}
 
@@ -527,9 +391,6 @@ export default function LocationsVillagesPage() {
         onOpenChange={setBulkOpen}
         onUpload={(pid, txt) => bulkUploadMutation.mutate({ parentId: pid, items: txt })}
         isUploading={bulkUploadMutation.isPending}
-        states={states}
-        districts={districts}
-        mandals={mandals}
       />
       <AlertDialog open={!!deactivateTarget} onOpenChange={(o) => !o && setDeactivateTarget(null)}>
         <AlertDialogContent>

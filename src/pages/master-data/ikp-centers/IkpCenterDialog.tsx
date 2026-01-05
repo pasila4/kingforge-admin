@@ -25,22 +25,10 @@ import {
 } from "@/components/ui/input-group";
 import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-    GroupedCombobox,
-    type GroupedComboboxGroup,
-} from "@/components/ui/grouped-combobox";
+import { LocationSearchCombobox } from "@/components/ui/location-search-combobox";
 
-import type {
-    AdminDistrict,
-    AdminMandal,
-    AdminState,
-    AdminVillage,
-} from "@/types/adminLocations";
 
 export const ikpCenterSchema = z.object({
-    stateId: z.string().min(1, "Select a state."),
-    districtId: z.string().min(1, "Select a district."),
-    mandalId: z.string().min(1, "Select a mandal."),
     villageId: z.string().min(1, "Select a village."),
     name: z.string().min(1, "Enter a center name."),
     notes: z.string().optional(),
@@ -57,22 +45,12 @@ export function IkpCenterDialog(props: {
     initialValues: IkpCenterFormData;
     onSave: (data: IkpCenterFormData) => void;
     isSaving: boolean;
-    states: AdminState[];
-    districts: AdminDistrict[];
-    mandals: AdminMandal[];
-    villages: AdminVillage[];
-    isStatesLoading: boolean;
-    isDistrictsLoading: boolean;
-    isMandalsLoading: boolean;
-    isVillagesLoading: boolean;
 }) {
     const {
         register,
         handleSubmit,
         reset,
         control,
-        setValue,
-        watch,
         formState: { errors, isValid, isDirty },
     } = useForm<IkpCenterFormData>({
         resolver: zodResolver(ikpCenterSchema),
@@ -80,73 +58,6 @@ export function IkpCenterDialog(props: {
         mode: "onChange",
     });
 
-    const selectedStateId = watch("stateId");
-    const selectedDistrictId = watch("districtId");
-    const selectedMandalId = watch("mandalId");
-
-    // Filter districts, mandals, and villages based on selected values
-    const filteredDistricts = React.useMemo(() => {
-        if (!selectedStateId) return [];
-        return props.districts.filter((d) => d.stateId === selectedStateId);
-    }, [props.districts, selectedStateId]);
-
-    const filteredMandals = React.useMemo(() => {
-        if (!selectedDistrictId) return [];
-        return props.mandals.filter((m) => m.districtId === selectedDistrictId);
-    }, [props.mandals, selectedDistrictId]);
-
-    const filteredVillages = React.useMemo(() => {
-        if (!selectedMandalId) return [];
-        return props.villages.filter((v) => v.mandalId === selectedMandalId);
-    }, [props.villages, selectedMandalId]);
-
-    const stateOptionGroups = React.useMemo<GroupedComboboxGroup[]>(() => {
-        return [
-            {
-                label: "States",
-                options: props.states.map((s) => ({
-                    value: s.id,
-                    label: `${s.code} - ${s.name}`,
-                })),
-            },
-        ];
-    }, [props.states]);
-
-    const districtOptionGroups = React.useMemo<GroupedComboboxGroup[]>(() => {
-        return [
-            {
-                label: "Districts",
-                options: filteredDistricts.map((d) => ({
-                    value: d.id,
-                    label: d.name,
-                })),
-            },
-        ];
-    }, [filteredDistricts]);
-
-    const mandalOptionGroups = React.useMemo<GroupedComboboxGroup[]>(() => {
-        return [
-            {
-                label: "Mandals",
-                options: filteredMandals.map((m) => ({
-                    value: m.id,
-                    label: m.name,
-                })),
-            },
-        ];
-    }, [filteredMandals]);
-
-    const villageOptionGroups = React.useMemo<GroupedComboboxGroup[]>(() => {
-        return [
-            {
-                label: "Villages",
-                options: filteredVillages.map((v) => ({
-                    value: v.id,
-                    label: v.name,
-                })),
-            },
-        ];
-    }, [filteredVillages]);
 
     React.useEffect(() => {
         if (props.open) reset(props.initialValues);
@@ -164,107 +75,16 @@ export function IkpCenterDialog(props: {
                     <FieldGroup>
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                             <Field>
-                                <FieldLabel>State</FieldLabel>
-                                <Controller
-                                    control={control}
-                                    name="stateId"
-                                    render={({ field }) => (
-                                        <GroupedCombobox
-                                            value={field.value}
-                                            onValueChange={(v) => {
-                                                field.onChange(v);
-                                                setValue("districtId", "");
-                                                setValue("mandalId", "");
-                                                setValue("villageId", "");
-                                            }}
-                                            groups={stateOptionGroups}
-                                            disabled={props.isStatesLoading}
-                                            placeholder="Select state"
-                                            emptyText="No states found."
-                                        />
-                                    )}
-                                />
-                                <FieldError errors={errors.stateId ? [errors.stateId] : []} />
-                            </Field>
-
-                            <Field>
-                                <FieldLabel>District</FieldLabel>
-                                <Controller
-                                    control={control}
-                                    name="districtId"
-                                    render={({ field }) => (
-                                        <GroupedCombobox
-                                            value={field.value}
-                                            onValueChange={(v) => {
-                                                field.onChange(v);
-                                                setValue("mandalId", "");
-                                                setValue("villageId", "");
-                                            }}
-                                            groups={districtOptionGroups}
-                                            disabled={!selectedStateId || props.isDistrictsLoading}
-                                            placeholder={
-                                                selectedStateId ? "Select district" : "Select state first"
-                                            }
-                                            emptyText={
-                                                selectedStateId
-                                                    ? "No districts found."
-                                                    : "Select a state first."
-                                            }
-                                        />
-                                    )}
-                                />
-                                <FieldError
-                                    errors={errors.districtId ? [errors.districtId] : []}
-                                />
-                            </Field>
-
-                            <Field>
-                                <FieldLabel>Mandal</FieldLabel>
-                                <Controller
-                                    control={control}
-                                    name="mandalId"
-                                    render={({ field }) => (
-                                        <GroupedCombobox
-                                            value={field.value}
-                                            onValueChange={(v) => {
-                                                field.onChange(v);
-                                                setValue("villageId", "");
-                                            }}
-                                            groups={mandalOptionGroups}
-                                            disabled={!selectedDistrictId || props.isMandalsLoading}
-                                            placeholder={
-                                                selectedDistrictId ? "Select mandal" : "Select district first"
-                                            }
-                                            emptyText={
-                                                selectedDistrictId
-                                                    ? "No mandals found."
-                                                    : "Select a district first."
-                                            }
-                                        />
-                                    )}
-                                />
-                                <FieldError errors={errors.mandalId ? [errors.mandalId] : []} />
-                            </Field>
-
-                            <Field>
                                 <FieldLabel>Village</FieldLabel>
                                 <Controller
                                     control={control}
                                     name="villageId"
                                     render={({ field }) => (
-                                        <GroupedCombobox
+                                        <LocationSearchCombobox
+                                            type="village"
                                             value={field.value}
                                             onValueChange={field.onChange}
-                                            groups={villageOptionGroups}
-                                            disabled={!selectedMandalId || props.isVillagesLoading}
-                                            placeholder={
-                                                selectedMandalId ? "Select village" : "Select mandal first"
-                                            }
-                                            emptyText={
-                                                selectedMandalId
-                                                    ? "No villages found."
-                                                    : "Select a mandal first."
-                                            }
+                                            placeholder="Search village..."
                                         />
                                     )}
                                 />

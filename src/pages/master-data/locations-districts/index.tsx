@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { MoreHorizontalIcon } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -47,11 +47,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  GroupedCombobox,
-  type GroupedComboboxGroup,
-} from "@/components/ui/grouped-combobox";
+
 import { Textarea } from "@/components/ui/textarea";
+
+import { LocationSearchCombobox } from "@/components/ui/location-search-combobox";
 
 import { useUiStore } from "@/store";
 import { useAuth } from "@/context/AuthContext";
@@ -63,9 +62,8 @@ import {
   deactivateAdminDistrict,
   deleteAdminDistrictPermanently,
   bulkUploadDistricts,
-  listAdminStates,
 } from "@/lib/adminLocations";
-import type { AdminDistrict, AdminState } from "@/types/adminLocations";
+import type { AdminDistrict } from "@/types/adminLocations";
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -80,13 +78,11 @@ function BulkUploadDistrictsDialog({
   onOpenChange,
   onUpload,
   isUploading,
-  states,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onUpload: (parentId: string, items: string) => void;
   isUploading: boolean;
-  states: AdminState[];
 }) {
   const [stateId, setStateId] = React.useState("");
   const [items, setItems] = React.useState("");
@@ -98,11 +94,6 @@ function BulkUploadDistrictsDialog({
     }
   }, [open]);
 
-  const stateGroups: GroupedComboboxGroup[] = React.useMemo(() => ([{
-    label: "States",
-    options: states.map(s => ({ value: s.id, label: s.name }))
-  }]), [states]);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
@@ -113,11 +104,11 @@ function BulkUploadDistrictsDialog({
         <div className="space-y-4">
           <Field>
             <FieldLabel>State</FieldLabel>
-            <GroupedCombobox
+            <LocationSearchCombobox
+              type="state"
               value={stateId}
               onValueChange={setStateId}
-              groups={stateGroups}
-              placeholder="Select State"
+              placeholder="Search state..."
             />
           </Field>
           <Field>
@@ -159,11 +150,6 @@ export default function LocationsDistrictsPage() {
   const [editing, setEditing] = React.useState<AdminDistrict | null>(null);
   const [deactivateTarget, setDeactivateTarget] = React.useState<AdminDistrict | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<AdminDistrict | null>(null);
-
-  const statesQuery = useQuery({
-    queryKey: ["adminStates"],
-    queryFn: () => listAdminStates({ limit: 100 }),
-  });
 
   const query = useQuery({
     queryKey: ["adminDistricts", page, debouncedSearch, stateFilter],
@@ -223,12 +209,6 @@ export default function LocationsDistrictsPage() {
   const items = query.data?.data?.items ?? [];
   const total = query.data?.data?.total ?? 0;
   const totalPages = Math.ceil(total / DEFAULT_PAGE_SIZE);
-  const states = statesQuery.data?.data?.items ?? [];
-
-  const stateGroups: GroupedComboboxGroup[] = React.useMemo(() => ([{
-    label: "States",
-    options: states.map(s => ({ value: s.id, label: s.name }))
-  }]), [states]);
 
   return (
     <div className="space-y-4">
@@ -250,11 +230,11 @@ export default function LocationsDistrictsPage() {
               <InputGroupAddon>Search</InputGroupAddon>
               <InputGroupInput value={search} onChange={e => setSearch(e.target.value)} placeholder="Search districts..." />
             </InputGroup>
-            <div className="w-[200px]">
-              <GroupedCombobox
+            <div className="w-[240px]">
+              <LocationSearchCombobox
+                type="state"
                 value={stateFilter}
                 onValueChange={setStateFilter}
-                groups={stateGroups}
                 placeholder="Filter by State"
               />
             </div>
@@ -281,13 +261,16 @@ export default function LocationsDistrictsPage() {
                     <TableRow key={item.id}>
                       <TableCell>{item.name}</TableCell>
                       <TableCell>{item.code || "-"}</TableCell>
-                      <TableCell>{states.find(s => s.id === item.stateId)?.name}</TableCell>
+                      <TableCell>{item.state?.name || "-"}</TableCell>
                       <TableCell>{item.isActive ? "Active" : "Inactive"}</TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">
                           <DropdownMenu>
-                            <DropdownMenuTrigger>
-                              <Button variant="ghost" size="icon-sm"><MoreHorizontalIcon className="size-4" /></Button>
+                            <DropdownMenuTrigger
+                              aria-label="Open actions"
+                              className={buttonVariants({ size: "icon-sm", variant: "ghost" })}
+                            >
+                              <MoreHorizontalIcon className="size-4" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => setEditing(item)}>Edit</DropdownMenuItem>
@@ -328,7 +311,6 @@ export default function LocationsDistrictsPage() {
           createMutation.mutate(payload);
         }}
         isSaving={createMutation.isPending}
-        states={states}
       />
 
       {editing && (
@@ -339,7 +321,6 @@ export default function LocationsDistrictsPage() {
           initialValues={{ stateId: editing.stateId, name: editing.name, code: editing.code || "", isActive: editing.isActive }}
           onSave={(data) => updateMutation.mutate({ id: editing.id, payload: data })}
           isSaving={updateMutation.isPending}
-          states={states}
         />
       )}
 
@@ -348,7 +329,6 @@ export default function LocationsDistrictsPage() {
         onOpenChange={setBulkOpen}
         onUpload={(pid, txt) => bulkUploadMutation.mutate({ parentId: pid, items: txt })}
         isUploading={bulkUploadMutation.isPending}
-        states={states}
       />
       {/* Alert Dialogs for Delete/Deactivate omitted for brevity but should be added if needed, I have logic for them above. I will add them. */}
       <AlertDialog open={!!deactivateTarget} onOpenChange={(o) => !o && setDeactivateTarget(null)}>

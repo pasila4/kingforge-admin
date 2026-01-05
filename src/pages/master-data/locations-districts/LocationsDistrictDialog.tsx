@@ -21,12 +21,7 @@ import {
     InputGroupInput,
 } from "@/components/ui/input-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-    GroupedCombobox,
-    type GroupedComboboxGroup,
-} from "@/components/ui/grouped-combobox";
-
-import type { AdminState } from "@/types/adminLocations";
+import { LocationSearchCombobox } from "@/components/ui/location-search-combobox";
 
 export const districtSchema = z.object({
     stateId: z.string().min(1, "Select a state."),
@@ -44,7 +39,6 @@ export function LocationsDistrictDialog({
     initialValues,
     onSave,
     isSaving,
-    states,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -52,7 +46,6 @@ export function LocationsDistrictDialog({
     initialValues: DistrictFormData;
     onSave: (data: DistrictFormData) => void;
     isSaving: boolean;
-    states: AdminState[];
 }) {
     const {
         register,
@@ -69,11 +62,6 @@ export function LocationsDistrictDialog({
         if (open) reset(initialValues);
     }, [open, initialValues, reset]);
 
-    const stateGroups: GroupedComboboxGroup[] = React.useMemo(() => ([{
-        label: "States",
-        options: states.map(s => ({ value: s.id, label: s.name }))
-    }]), [states]);
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
@@ -87,11 +75,11 @@ export function LocationsDistrictDialog({
                             control={control}
                             name="stateId"
                             render={({ field }) => (
-                                <GroupedCombobox
+                                <LocationSearchCombobox
+                                    type="state"
                                     value={field.value}
                                     onValueChange={field.onChange}
-                                    groups={stateGroups}
-                                    placeholder="Select state"
+                                    placeholder="Search state..."
                                 />
                             )}
                         />

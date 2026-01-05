@@ -21,15 +21,9 @@ import {
     InputGroupInput,
 } from "@/components/ui/input-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-    GroupedCombobox,
-    type GroupedComboboxGroup,
-} from "@/components/ui/grouped-combobox";
-
-import type { AdminState, AdminDistrict } from "@/types/adminLocations";
+import { LocationSearchCombobox } from "@/components/ui/location-search-combobox";
 
 export const mandalSchema = z.object({
-    stateId: z.string().min(1, "Select a state."),
     districtId: z.string().min(1, "Select a district."),
     name: z.string().min(1, "Enter a mandal name."),
     code: z.string().optional(),
@@ -45,8 +39,6 @@ export function LocationsMandalDialog({
     initialValues,
     onSave,
     isSaving,
-    states,
-    districts,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -54,16 +46,12 @@ export function LocationsMandalDialog({
     initialValues: MandalFormData;
     onSave: (data: MandalFormData) => void;
     isSaving: boolean;
-    states: AdminState[];
-    districts: AdminDistrict[];
 }) {
     const {
         register,
         handleSubmit,
         reset,
         control,
-        watch,
-        setValue,
         formState: { errors, isValid },
     } = useForm<MandalFormData>({
         resolver: zodResolver(mandalSchema),
@@ -74,23 +62,6 @@ export function LocationsMandalDialog({
         if (open) reset(initialValues);
     }, [open, initialValues, reset]);
 
-    const selectedStateId = watch("stateId");
-
-    const filteredDistricts = React.useMemo(() => {
-        if (!selectedStateId) return [];
-        return districts.filter(d => d.stateId === selectedStateId);
-    }, [districts, selectedStateId]);
-
-    const stateGroups: GroupedComboboxGroup[] = React.useMemo(() => ([{
-        label: "States",
-        options: states.map(s => ({ value: s.id, label: s.name }))
-    }]), [states]);
-
-    const districtGroups: GroupedComboboxGroup[] = React.useMemo(() => ([{
-        label: "Districts",
-        options: filteredDistricts.map(d => ({ value: d.id, label: d.name }))
-    }]), [filteredDistricts]);
-
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-md">
@@ -99,37 +70,16 @@ export function LocationsMandalDialog({
                 </DialogHeader>
                 <form onSubmit={handleSubmit(onSave)} className="space-y-4">
                     <Field>
-                        <FieldLabel>State</FieldLabel>
-                        <Controller
-                            control={control}
-                            name="stateId"
-                            render={({ field }) => (
-                                <GroupedCombobox
-                                    value={field.value}
-                                    onValueChange={(v) => {
-                                        field.onChange(v);
-                                        setValue("districtId", "");
-                                    }}
-                                    groups={stateGroups}
-                                    placeholder="Select state"
-                                />
-                            )}
-                        />
-                        <FieldError errors={errors.stateId ? [errors.stateId] : []} />
-                    </Field>
-
-                    <Field>
                         <FieldLabel>District</FieldLabel>
                         <Controller
                             control={control}
                             name="districtId"
                             render={({ field }) => (
-                                <GroupedCombobox
+                                <LocationSearchCombobox
+                                    type="district"
                                     value={field.value}
                                     onValueChange={field.onChange}
-                                    groups={districtGroups}
-                                    placeholder="Select district"
-                                    disabled={!selectedStateId}
+                                    placeholder="Search district..."
                                 />
                             )}
                         />
